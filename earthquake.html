@@ -46,6 +46,17 @@
         tr:nth-child(even) {
             background-color: #f2f2f2;
         }
+
+        @media (max-width: 1024px) {
+            .side-panel {
+                display: none; 
+            }
+
+            #map {
+                flex-grow: 1; 
+            }
+        }
+
     </style>
  </head>
  <body>
@@ -75,7 +86,6 @@
             zoom: 5.5, // starting zoom
             center: [138, 38] // starting center
         });
-
 
         async function geojsonFetch() {
             let response;

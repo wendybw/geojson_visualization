@@ -1,58 +1,214 @@
 <!DOCTYPE html>
 <html lang="en-US">
-
-<head>
+ <head>
     <meta charset="utf-8">
-    <title>Mapbox Customized Map Design</title>
+    <title>Wildfire List</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-
-    <!-- Including the Mapbox GL CSS file -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
-
-    <!-- Including the Mapbox GL JS file -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
-
     <style>
-        /* CSS styles for the body */
         body {
             margin: 0;
             padding: 0;
         }
 
-        /* CSS styles for the container */
         #container {
             display: flex;
             height: 100vh;
+            flex-direction: row;
+            align-items: stretch;
+        }
+        .side-panel {
+            flex-basis: 500px;
+            overflow-y: scroll;
         }
 
-        /* CSS styles for the map */
         #map {
-            flex-grow: 1;
+                flex-grow: 1; 
+            }
+
+        button {
+            margin-bottom: 10px;
         }
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 100%;
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 16px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        @media (max-width: 1024px) {
+            .side-panel {
+                display: none; /* Hide the side panel when the width is 1024px or smaller */
+            }
+
+            #map {
+                flex-grow: 1; /* Expand the map to take the full width when the side panel is hidden */
+            }
+        }
+
+
     </style>
-</head>
-
-<body>
+ </head>
+ <body>
     <main id="container">
-
+        <div class="side-panel">
+            <h2>Wildfire List</h2>
+            <button>Sort by Date</button>
+            <table>
+                <tr>
+                    <th>Event ID</th>
+                    <th>Incident Name</th>
+                    <th>Ignition Date</th>
+                </tr>
+            </table>
+        </div>
         <div id="map"></div>
-
     </main>
     <script>
         // Initialize the Mapbox access token
         mapboxgl.accessToken =
-            'pk.eyJ1IjoiamFrb2J6aGFvIiwiYSI6ImNpcms2YWsyMzAwMmtmbG5icTFxZ3ZkdncifQ.P9MBej1xacybKcDN_jehvw';
+            'pk.eyJ1Ijoid2VuZHlidSIsImEiOiJjbG9vdWx2OHAwMXQxMmxtdW54NjN2ODh0In0.xeRw89y7CM7QdOHO896jYg';
 
         // Create the map object
         let map = new mapboxgl.Map({
             container: 'map', // container ID
-            style: 'mapbox://styles/jakobzhao/ckvik216t18u714pixt166rqq', // style URL
-            zoom: 11.5, // starting zoom
-            center: [-122.32, 47.67] // starting center
+            style: 'mapbox://styles/mapbox/navigation-night-v1', // style URL
+            zoom: 3.5, // starting zoom
+            center: [-98.5795, 39.8283] // starting center
+        });
+
+
+        async function geojsonFetch() {
+            let response;
+            response = await fetch('assets/wildfires.geojson');
+            wildfires= await response.json();
+            response = await fetch('assets/States_shapefile.geojson');
+            states = await response.json();
+        }
+
+        geojsonFetch();
+
+        //load data to the map as new layers and table on the side.
+        map.on('load', function loadingData() {
+        map.addSource('wildfires', {
+            type: 'geojson',
+            data: wildfires
+        });
+
+        map.addLayer({
+            'id': 'wildfires-layer',
+            'type': 'circle',
+            'source': 'wildfires',
+            'paint': {
+                'circle-radius': 8,
+                'circle-stroke-width': 2,
+                'circle-color': 'red',
+                'circle-stroke-color': 'white'
+            }
+        });
+
+        map.addSource('States_shapefile', {
+            type: 'geojson',
+            data: states
+        });
+
+        map.addLayer({
+            'id': 'states-layer',
+            'type': 'fill',
+            'source': 'States_shapefile',
+            'paint': {
+                'fill-color': '#0080ff', // blue color fill
+                'fill-opacity': 0.5
+            }
+        });
+
+        });
+
+        function populateTable() {
+            let table = document.getElementsByTagName("table")[0];
+            // Clear existing rows from the table
+            table.innerHTML = "";
+
+            // Add header row
+            let headerRow = table.insertRow(0);
+            let headers = ["Event ID", "Incident Name", "Ignition Date"];
+            for (let i = 0; i < headers.length; i++) {
+                let headerCell = headerRow.insertCell(i);
+                headerCell.innerHTML = headers[i];
+            }
+
+            // Add data rows
+            for (let i = 0; i < wildfires.features.length; i++) {
+                let row = table.insertRow(i + 1);
+                let properties = wildfires.features[i].properties;
+
+                // Assuming the structure of your GeoJSON properties
+                let eventID = properties.Event_ID;
+                let incidentName = properties.Incid_Name;
+                let ignitionDate = new Date(properties.Ig_Date).toLocaleDateString("en-US");
+
+                let cell1 = row.insertCell(0);
+                let cell2 = row.insertCell(1);
+                let cell3 = row.insertCell(2);
+
+                cell1.innerHTML = eventID;
+                cell2.innerHTML = incidentName;
+                cell3.innerHTML = ignitionDate;
+            }
+        }
+
+
+         // define the function to sort table
+        function sortTable() {
+            let table, rows, i;
+            table = document.getElementsByTagName("table")[0];
+            rows = Array.from(table.rows).slice(1); // Exclude the header row
+
+            rows.sort(function (a, b) {
+                let dateA = new Date(a.cells[2].innerHTML);
+                let dateB = new Date(b.cells[2].innerHTML);
+                return dateA - dateB;
+            });
+
+            // Clear the existing table rows
+            table.innerHTML = "";
+
+            // Add header row
+            let headerRow = table.insertRow(0);
+            let headers = ["Event ID", "Incident Name", "Ignition Date"];
+            for (let i = 0; i < headers.length; i++) {
+                let headerCell = headerRow.insertCell(i);
+                headerCell.innerHTML = headers[i];
+            }
+
+            // Add sorted data rows
+            rows.forEach(function (row) {
+                table.appendChild(row);
+            });
+        }
+
+
+
+
+        // Attach the populateTable function to the "Sort by Magnitude" button click event
+        let btn = document.getElementsByTagName("button")[0];
+        btn.addEventListener('click', function() {
+            populateTable();
+            sortTable();
         });
 
     </script>
 
-</body>
-
-</html>
+ </body>
+<html>    
